@@ -252,20 +252,52 @@ async function loadAll(){
 }
 function startPoll(){stopPoll();S.timer=setInterval(poll,POLL)}
 function stopPoll(){if(S.timer)clearInterval(S.timer)}
-async function poll(){
-  if(!S.admin)return;
-  const idx=await sg(IDX)||{order:[]};const ro=idx.order||[];
-  let ch=false;
-  for(const id of ro){
-    const d=await sg(PFX+id);if(!d)continue;
-    if(!S.clients[id]){S.clients[id]=d;S.lts[id]=d._ts||0;S.order=ro;ch=true}
-    else if(d._ts>(S.lts[id]||0)&&id!==S.aid){S.clients[id]=d;S.lts[id]=d._ts;ch=true}
+async function poll() {
+  if (!S.admin) return;
+  const idx = await sg(IDX) || { order: [] };
+  const ro = idx.order || [];
+  let ch = false;
+
+  for (const id of ro) {
+    const d = await sg(PFX + id);
+    if (!d) continue;
+
+    // Fix: If this is a new client we don't have in memory yet
+    if (!S.clients[id]) {
+      S.clients[id] = d;
+      S.lts[id] = d._ts || 0;
+      ch = true;
+    } 
+    // Fix: Update existing client data only if the timestamp is newer
+    // AND it's not the client we are currently editing (to prevent overwrite flickers)
+    else if (d._ts > (S.lts[id] || 0) && id !== S.aid) {
+      S.clients[id] = d;
+      S.lts[id] = d._ts;
+      ch = true;
+    }
   }
-  for(const id of[...S.order]){
-    if(!ro.includes(id)){delete S.clients[id];S.order=ro;if(S.aid===id){S.aid=null;emptyMain()}ch=true}
+
+  // Check if any clients were deleted from storage
+  for (const id of [...S.order]) {
+    if (!ro.includes(id)) {
+      delete S.clients[id];
+      if (S.aid === id) {
+        // Only clear the dashboard if the client was actually deleted
+        S.aid = null;
+        emptyMain();
+      }
+      ch = true;
+    }
   }
-  if(ch){S.order=ro;renderSB()}
-  S.order.forEach(id=>updMB(id));
+
+  if (ch) {
+    S.order = ro;
+    renderSB();
+    // If we have an active ID, ensure it stays rendered
+    if (S.aid) renderMain(); 
+  }
+  
+  S.order.forEach(id => updMB(id));
 }
 function openModal(){document.getElementById('mnc').classList.add('open');setTimeout(()=>document.getElementById('ncn').focus(),80)}
 function closeModal(){document.getElementById('mnc').classList.remove('open');['ncn','ncc','nce'].forEach(id=>document.getElementById(id).value='')}
