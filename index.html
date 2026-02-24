@@ -269,15 +269,38 @@ async function poll(){
 }
 function openModal(){document.getElementById('mnc').classList.add('open');setTimeout(()=>document.getElementById('ncn').focus(),80)}
 function closeModal(){document.getElementById('mnc').classList.remove('open');['ncn','ncc','nce'].forEach(id=>document.getElementById(id).value='')}
-async function createClient(){
-  const name=document.getElementById('ncn').value.trim();
-  if(!name){toast('Enter a client name','error');return}
-  const contact=document.getElementById('ncc').value.trim(),email=document.getElementById('nce').value.trim();
-  const id=mkId(name);
-  const c={meta:{id,name,contact,email,createdAt:Date.now()},fields:{},_ts:Date.now()};
-  S.clients[id]=c;S.order.push(id);S.lts[id]=c._ts;
-  await ss(IDX,{order:S.order});await ss(PFX+id,c);
-  closeModal();renderSB();selectC(id);toast(`"${name}" created!`,'success');
+async function createClient() {
+  const name = document.getElementById('ncn').value.trim();
+  if (!name) {
+    toast('Enter a client name', 'error');
+    return;
+  }
+  const contact = document.getElementById('ncc').value.trim();
+  const email = document.getElementById('nce').value.trim();
+  const id = mkId(name);
+  
+  // 1. Create the client object
+  const c = { 
+    meta: { id, name, contact, email, createdAt: Date.now() }, 
+    fields: {}, 
+    _ts: Date.now() 
+  };
+  
+  // 2. Update local state BEFORE storage to prevent the poller from clearing it
+  S.clients[id] = c;
+  S.order.push(id);
+  S.lts[id] = c._ts;
+  S.aid = id; // Set active ID immediately
+
+  // 3. Save to storage
+  await ss(IDX, { order: S.order });
+  await ss(PFX + id, c);
+  
+  // 4. Update UI
+  closeModal();
+  renderSB();
+  renderMain(); // Force immediate render
+  toast(`"${name}" created!`, 'success');
 }
 function mkId(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,20)+'-'+Math.random().toString(36).slice(2,7)}
 async function delClient(id){
